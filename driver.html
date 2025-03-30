@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Bus Tracker</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4285F4;
+            --secondary-color: #34A853;
+            --warning-color: #FBBC05;
+            --danger-color: #EA4335;
+            --light-gray: #f5f5f5;
+            --dark-gray: #333;
+            --medium-gray: #757575;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        body {
+            background-color: #f9f9f9;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 {
+            color: var(--dark-gray);
+            margin-bottom: 15px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .status-circle {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .status-active {
+            background-color: var(--secondary-color);
+            box-shadow: 0 0 10px var(--secondary-color);
+        }
+        
+        .status-inactive {
+            background-color: var(--danger-color);
+        }
+        
+        .status-waiting {
+            background-color: var(--warning-color);
+        }
+        
+        .status-arrived {
+            background-color: var(--primary-color);
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .location-info {
+            margin-top: 15px;
+        }
+        
+        .route-selector {
+            margin-bottom: 20px;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        
+        .driver-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: var(--light-gray);
+            border-radius: 8px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: var(--medium-gray);
+        }
+        
+        .info-value {
+            font-weight: 500;
+        }
+        
+        .time-display {
+            color: var(--primary-color);
+        }
+        
+        .notification-banner {
+            padding: 15px;
+            background-color: var(--warning-color);
+            color: #000;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification-banner .material-icons {
+            margin-right: 10px;
+        }
+        
+        .checkpoint-list {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .checkpoint-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .checkpoint-item:last-child {
+            border-bottom: none;
+        }
+        
+        .checkpoint-name {
+            font-weight: 500;
+        }
+        
+        .checkpoint-status {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background-color: #eee;
+        }
+        
+        .status-pending {
+            background-color: #FFE0B2;
+            color: #E65100;
+        }
+        
+        .status-arrived {
+            background-color: #C8E6C9;
+            color: #2E7D32;
+        }
+        
+        .status-current {
+            background-color: #BBDEFB;
+            color: #0D47A1;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .notification .material-icons {
+            margin-right: 10px;
+        }
+        
+        .checkpoint-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .checkpoint-details {
+            flex: 1;
+        }
+        
+        .driver-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 10px 15px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-success {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn .material-icons {
+            margin-right: 5px;
+        }
+        
+        .current-location {
+            background-color: rgba(251, 188, 5, 0.1);
+            border-left: 4px solid #FBBC05;
+        }
+        
+        @media (min-width: 768px) {
+            .dashboard {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Driver Bus Tracker</h1>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="dashboard">
+            <div class="card">
+                <h2>Bus Location</h2>
+                <div class="status-indicator">
+                    <div class="status-circle status-inactive" id="statusCircle"></div>
+                    <span id="statusText">Select your route to begin tracking</span>
+                </div>
+                
+                <div class="driver-controls">
+                    <button id="startRouteBtn" class="btn btn-primary" disabled>
+                        <span class="material-icons">directions_bus</span>
+                        Start Route
+                    </button>
+                    <button id="completeRouteBtn" class="btn btn-success" disabled>
+                        <span class="material-icons">check_circle</span>
+                        Complete Route
+                    </button>
+                    <button id="resetRouteBtn" class="btn btn-danger" disabled>
+                        <span class="material-icons">refresh</span>
+                        Reset
+                    </button>
+                </div>
+                
+                <div class="route-selector">
+                    <select class="form-select" id="routeSelect">
+                        <option value="">-- Select Your Route --</option>
+                    </select>
+                </div>
+                
+                <div id="map"></div>
+                
+                <div class="driver-info">
+                    <div class="info-row">
+                        <span class="info-label">Current Location:</span>
+                        <span class="info-value" id="currentLocation">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Bus Number:</span>
+                        <span class="info-value" id="busNumber">TN-72-AB-1234</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Next Checkpoint:</span>
+                        <span class="info-value" id="nextCheckpoint">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Distance to Next:</span>
+                        <span class="info-value" id="distanceToNext">-</span>
+                    </div>
+                </div>
+                
+                <div id="notificationBanner" class="notification-banner" style="display: none;">
+                    <span class="material-icons">info</span>
+                    <span id="bannerMessage">Approaching next checkpoint</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Route Information</h2>
+                <div id="routeInfo">
+                    <p>Select your route to view details</p>
+                </div>
+                
+                <h2>Checkpoints</h2>
+                <div class="checkpoint-list" id="checkpointsList">
+                    <!-- Checkpoints will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <span class="material-icons">directions_bus</span>
+        <span id="notificationMessage">Approaching checkpoint</span>
+    </div>
+
+    <!-- Load Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&libraries=geometry&callback=initMap" async defer></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Map variables
+            let map;
+            let markers = [];
+            let polyline = null;
+            let selectedRoute = null;
+            let savedRoutes = [];
+            let directionArrows = [];
+            let busMarker = null;
+            let currentPosition = null;
+            let positionWatchId = null;
+            let currentCheckpointIndex = 0;
+            let routeActive = false;
+            let checkpointThreshold = 100; // meters to consider checkpoint reached
+            
+            // Initialize the map
+            function initMap() {
+                try {
+                    // Create a default map centered at coordinates from your JSON metadata
+                    map = new google.maps.Map(document.getElementById('map'), {
+                        center: { lat: 9.543742529250423, lng: 77.66185998296893 },
+                        zoom: 13,
+                        gestureHandling: 'greedy',
+                        mapTypeControl: true,
+                        streetViewControl: false,
+                        fullscreenControl: true
+                    });
+                    
+                    // Load routes from JSON file
+                    fetchRoutes();
+                    
+                    // Set up button event listeners
+                    document.getElementById('startRouteBtn').addEventListener('click', startRoute);
+                    document.getElementById('completeRouteBtn').addEventListener('click', completeRoute);
+                    document.getElementById('resetRouteBtn').addEventListener('click', resetRoute);
+                    
+                } catch (error) {
+                    alert('Failed to initialize Google Maps.');
+                }
+            }
+            
+            // Fetch routes from JSON file
+            function fetchRoutes() {
+                fetch('routes.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load routes');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Handle both array and single route cases
+                        if (Array.isArray(data)) {
+                            savedRoutes = data;
+                        } else {
+                            savedRoutes = [data];
+                        }
+                        updateRouteSelect();
+                    })
+                    .catch(error => {
+                        console.error('Error loading routes:', error);
+                        document.getElementById('statusText').textContent = 'Error loading routes. Please try again later.';
+                        document.getElementById('routeSelect').innerHTML = '<option value="">-- No routes available --</option>';
+                    });
+            }
+            
+            // Update route select dropdown
+            function updateRouteSelect() {
+                const routeSelect = document.getElementById('routeSelect');
+                routeSelect.innerHTML = '<option value="">-- Select Your Route --</option>';
+                
+                savedRoutes.forEach((route, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = route.name;
+                    routeSelect.appendChild(option);
+                });
+                
+                routeSelect.addEventListener('change', function() {
+                    const selectedIndex = parseInt(this.value);
+                    if (!isNaN(selectedIndex) && selectedIndex >= 0 && selectedIndex < savedRoutes.length) {
+                        loadRoute(selectedIndex);
+                        document.getElementById('startRouteBtn').disabled = false;
+                    } else {
+                        document.getElementById('startRouteBtn').disabled = true;
+                    }
+                });
+            }
+            
+            // Load selected route
+            function loadRoute(index) {
+                selectedRoute = savedRoutes[index];
+                currentCheckpointIndex = 0;
+                
+                // Update status
+                document.getElementById('statusText').textContent = `Route selected: ${selectedRoute.name}`;
+                document.getElementById('statusCircle').className = 'status-circle status-waiting';
+                
+                // Update route info
+                document.getElementById('routeInfo').innerHTML = `
+                    <p><strong>Route:</strong> ${selectedRoute.name}</p>
+                    ${selectedRoute.description ? `<p><strong>Description:</strong> ${selectedRoute.description}</p>` : ''}
+                    <p><strong>Total Checkpoints:</strong> ${selectedRoute.points.length}</p>
+                    ${selectedRoute.metadata?.totalDistance ? `<p><strong>Total Distance:</strong> ${(selectedRoute.metadata.totalDistance/1000).toFixed(2)} km</p>` : ''}
+                `;
+                
+                // Update next checkpoint info
+                updateNextCheckpointInfo();
+                
+                // Update checkpoints list
+                const checkpointsList = document.getElementById('checkpointsList');
+                checkpointsList.innerHTML = '';
+                
+                if (selectedRoute.points.length === 0) {
+                    checkpointsList.innerHTML = '<p>No checkpoints available for this route</p>';
+                } else {
+                    selectedRoute.points.forEach((point, index) => {
+                        const checkpointItem = document.createElement('div');
+                        checkpointItem.className = `checkpoint-item ${index === 0 ? 'current-location' : ''}`;
+                        checkpointItem.innerHTML = `
+                            <div class="checkpoint-marker" style="background-color: ${index === 0 ? '#EA4335' : '#4285F4'}">${index + 1}</div>
+                            <div class="checkpoint-details">
+                                <div class="checkpoint-name">${point.name || `Checkpoint ${index + 1}`}</div>
+                                <div class="coordinates">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
+                            </div>
+                            <div class="checkpoint-status ${index === 0 ? 'status-current' : 'status-pending'}">
+                                ${index === 0 ? 'Current' : 'Pending'}
+                            </div>
+                        `;
+                        checkpointsList.appendChild(checkpointItem);
+                    });
+                }
+                
+                // Update map
+                updateMap();
+            }
+            
+            // Update map with route points
+            function updateMap() {
+                // Clear existing markers and polyline
+                markers.forEach(marker => marker.setMap(null));
+                markers = [];
+                
+                if (polyline) {
+                    polyline.setMap(null);
+                }
+                
+                directionArrows.forEach(marker => marker.setMap(null));
+                directionArrows = [];
+                
+                if (!selectedRoute || selectedRoute.points.length === 0) return;
+                
+                // Add markers for each point
+                selectedRoute.points.forEach((point, index) => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: point.lat, lng: point.lng },
+                        map: map,
+                        title: point.name || `Checkpoint ${index + 1}`,
+                        label: {
+                            text: (index + 1).toString(),
+                            color: '#FFFFFF',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                        },
+                        icon: {
+                            url: index === 0 ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 
+                                 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                            scaledSize: new google.maps.Size(32, 32)
+                        }
+                    });
+                    
+                    markers.push(marker);
+                });
+                
+                // Add bus marker
+                if (!busMarker) {
+                    busMarker = new google.maps.Marker({
+                        position: { lat: selectedRoute.points[0].lat, lng: selectedRoute.points[0].lng },
+                        map: map,
+                        title: "Your Bus",
+                        icon: {
+                            url: 'https://maps.google.com/mapfiles/ms/icons/bus.png',
+                            scaledSize: new google.maps.Size(40, 40)
+                        }
+                    });
+                } else {
+                    busMarker.setPosition({ lat: selectedRoute.points[0].lat, lng: selectedRoute.points[0].lng });
+                }
+                
+                // Add polyline connecting the points
+                if (selectedRoute.points.length >= 2) {
+                    const path = selectedRoute.points.map(point => ({
+                        lat: point.lat,
+                        lng: point.lng
+                    }));
+                    
+                    polyline = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: '#FF0000',
+                        strokeOpacity: 0.7,
+                        strokeWeight: 4,
+                        map: map
+                    });
+                    
+                    // Add direction arrows
+                    addDirectionArrows(map, polyline);
+                }
+                
+                // Fit map to bounds
+                if (selectedRoute.points.length > 0) {
+                    const bounds = new google.maps.LatLngBounds();
+                    selectedRoute.points.forEach(point => {
+                        bounds.extend(new google.maps.LatLng(point.lat, point.lng));
+                    });
+                    map.fitBounds(bounds);
+                    
+                    // If route has mapCenter and mapZoom in metadata, use those
+                    if (selectedRoute.metadata?.mapCenter && selectedRoute.metadata?.mapZoom) {
+                        map.setCenter(selectedRoute.metadata.mapCenter);
+                        map.setZoom(selectedRoute.metadata.mapZoom);
+                    }
+                }
+            }
+            
+            // Add direction arrows to the polyline
+            function addDirectionArrows(map, polyline) {
+                const arrowSpacing = 2000; // in meters
+                const path = polyline.getPath();
+                
+                for (let i = 0; i < path.getLength() - 1; i++) {
+                    const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
+                        path.getAt(i), path.getAt(i + 1));
+                    
+                    const numArrows = Math.floor(segmentLength / arrowSpacing);
+                    
+                    for (let j = 0; j < numArrows; j++) {
+                        const position = google.maps.geometry.spherical.interpolate(
+                            path.getAt(i), path.getAt(i + 1), j / numArrows);
+                        
+                        const heading = google.maps.geometry.spherical.computeHeading(
+                            path.getAt(i), path.getAt(i + 1));
+                        
+                        const arrowMarker = new google.maps.Marker({
+                            position: position,
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                fillColor: '#FF0000',
+                                fillOpacity: 0.8,
+                                strokeWeight: 0,
+                                scale: 3,
+                                rotation: heading
+                            },
+                            zIndex: 1000
+                        });
+                        
+                        directionArrows.push(arrowMarker);
+                    }
+                }
+            }
+            
+            // Start route tracking
+            function startRoute() {
+                if (!selectedRoute) return;
+                
+                // Request location permission
+                if (navigator.geolocation) {
+                    document.getElementById('statusText').textContent = `Tracking route: ${selectedRoute.name}`;
+                    document.getElementById('statusCircle').className = 'status-circle status-active';
+                    
+                    positionWatchId = navigator.geolocation.watchPosition(
+                        position => {
+                            currentPosition = {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            };
+                            
+                            // Update bus marker position
+                            busMarker.setPosition(currentPosition);
+                            
+                            // Update current location display
+                            document.getElementById('currentLocation').textContent = 
+                                `${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
+                            
+                            // Check if we've reached the next checkpoint
+                            checkCheckpointProximity();
+                            
+                            // Center map on current position
+                            map.panTo(currentPosition);
+                        },
+                        error => {
+                            console.error('Geolocation error:', error);
+                            showNotification('Error getting your location');
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            maximumAge: 30000,
+                            timeout: 27000
+                        }
+                    );
+                    
+                    routeActive = true;
+                    document.getElementById('startRouteBtn').disabled = true;
+                    document.getElementById('completeRouteBtn').disabled = false;
+                    document.getElementById('resetRouteBtn').disabled = false;
+                    
+                    showNotification('Route tracking started');
+                } else {
+                    showNotification('Geolocation is not supported by your browser');
+                }
+            }
+            
+            // Check if we're close enough to the next checkpoint
+            function checkCheckpointProximity() {
+                if (!routeActive || !currentPosition || currentCheckpointIndex >= selectedRoute.points.length - 1) return;
+                
+                const nextCheckpoint = selectedRoute.points[currentCheckpointIndex + 1];
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+                    new google.maps.LatLng(nextCheckpoint.lat, nextCheckpoint.lng)
+                );
+                
+                // Update distance display
+                document.getElementById('distanceToNext').textContent = 
+                    distance < 1000 ? `${Math.round(distance)} meters` : `${(distance/1000).toFixed(1)} km`;
+                
+                // Check if we've reached the checkpoint
+                if (distance <= checkpointThreshold) {
+                    // Move to next checkpoint
+                    currentCheckpointIndex++;
+                    
+                    // Update checkpoint status
+                    updateCheckpointStatus();
+                    
+                    // Show notification
+                    const checkpointName = nextCheckpoint.name || `Checkpoint ${currentCheckpointIndex + 1}`;
+                    showNotification(`Reached ${checkpointName}`);
+                    
+                    // Update banner
+                    document.getElementById('bannerMessage').textContent = `Arrived at ${checkpointName}`;
+                    document.getElementById('notificationBanner').style.display = 'flex';
+                    
+                    // Update next checkpoint info
+                    updateNextCheckpointInfo();
+                    
+                    // If we've reached the last checkpoint, complete the route
+                    if (currentCheckpointIndex >= selectedRoute.points.length - 1) {
+                        completeRoute();
+                    }
+                } else if (distance <= 500) { // Notify when approaching checkpoint
+                    const checkpointName = nextCheckpoint.name || `Checkpoint ${currentCheckpointIndex + 2}`;
+                    document.getElementById('bannerMessage').textContent = `Approaching ${checkpointName} (${Math.round(distance)}m)`;
+                    document.getElementById('notificationBanner').style.display = 'flex';
+                }
+            }
+            
+            // Update checkpoint status in the list
+            function updateCheckpointStatus() {
+                const checkpoints = document.querySelectorAll('.checkpoint-item');
+                checkpoints.forEach((checkpoint, index) => {
+                    const statusElement = checkpoint.querySelector('.checkpoint-status');
+                    
+                    // Remove current-location class from all
+                    checkpoint.classList.remove('current-location');
+                    
+                    if (index < currentCheckpointIndex) {
+                        statusElement.className = 'checkpoint-status status-arrived';
+                        statusElement.textContent = 'Passed';
+                    } else if (index === currentCheckpointIndex) {
+                        statusElement.className = 'checkpoint-status status-current';
+                        statusElement.textContent = 'Current';
+                        checkpoint.classList.add('current-location');
+                    } else {
+                        statusElement.className = 'checkpoint-status status-pending';
+                        statusElement.textContent = 'Pending';
+                    }
+                });
+            }
+            
+            // Update next checkpoint info display
+            function updateNextCheckpointInfo() {
+                if (currentCheckpointIndex < selectedRoute.points.length - 1) {
+                    const nextCheckpoint = selectedRoute.points[currentCheckpointIndex + 1];
+                    document.getElementById('nextCheckpoint').textContent = 
+                        nextCheckpoint.name || `Checkpoint ${currentCheckpointIndex + 2}`;
+                } else {
+                    document.getElementById('nextCheckpoint').textContent = 'End of route';
+                    document.getElementById('distanceToNext').textContent = '-';
+                }
+            }
+            
+            // Complete the current route
+            function completeRoute() {
+                if (positionWatchId) {
+                    navigator.geolocation.clearWatch(positionWatchId);
+                    positionWatchId = null;
+                }
+                
+                document.getElementById('statusText').textContent = 'Route completed';
+                document.getElementById('statusCircle').className = 'status-circle status-arrived';
+                document.getElementById('completeRouteBtn').disabled = true;
+                document.getElementById('startRouteBtn').disabled = true;
+                
+                showNotification('Route completed successfully');
+                
+                // Update checkpoint status to show all passed
+                const checkpoints = document.querySelectorAll('.checkpoint-item');
+                checkpoints.forEach((checkpoint, index) => {
+                    const statusElement = checkpoint.querySelector('.checkpoint-status');
+                    statusElement.className = 'checkpoint-status status-arrived';
+                    statusElement.textContent = 'Passed';
+                });
+                
+                document.getElementById('nextCheckpoint').textContent = 'End of route';
+                document.getElementById('distanceToNext').textContent = '-';
+                document.getElementById('bannerMessage').textContent = 'Route completed';
+                document.getElementById('notificationBanner').style.display = 'flex';
+                
+                routeActive = false;
+            }
+            
+            // Reset the route tracking
+            function resetRoute() {
+                if (positionWatchId) {
+                    navigator.geolocation.clearWatch(positionWatchId);
+                    positionWatchId = null;
+                }
+                
+                currentCheckpointIndex = 0;
+                routeActive = false;
+                
+                // Reset bus marker to start position
+                if (selectedRoute && selectedRoute.points.length > 0 && busMarker) {
+                    busMarker.setPosition({
+                        lat: selectedRoute.points[0].lat,
+                        lng: selectedRoute.points[0].lng
+                    });
+                }
+                
+                document.getElementById('statusText').textContent = `Route selected: ${selectedRoute.name}`;
+                document.getElementById('statusCircle').className = 'status-circle status-waiting';
+                document.getElementById('currentLocation').textContent = '-';
+                document.getElementById('nextCheckpoint').textContent = '-';
+                document.getElementById('distanceToNext').textContent = '-';
+                document.getElementById('notificationBanner').style.display = 'none';
+                
+                document.getElementById('startRouteBtn').disabled = false;
+                document.getElementById('completeRouteBtn').disabled = true;
+                document.getElementById('resetRouteBtn').disabled = true;
+                
+                // Reset checkpoint status
+                updateCheckpointStatus();
+                updateNextCheckpointInfo();
+                
+                showNotification('Route reset');
+            }
+            
+            // Show notification
+            function showNotification(message) {
+                const notification = document.getElementById('notification');
+                document.getElementById('notificationMessage').textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 5000);
+            }
+            
+            // Initialize
+            window.initMap = initMap;
+        });
+    </script>
+</body>
+</html>

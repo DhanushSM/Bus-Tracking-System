@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Tracking System - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+        }
+        .checkpoint-card {
+            padding: 10px;
+            margin-bottom: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            cursor: move;
+        }
+        .checkpoint-card.active {
+            border-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .coordinates {
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        .file-status {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .unsaved-changes {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">Bus Tracking System - Admin Panel</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Route Management</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="routeName" class="form-label">Route Name*</label>
+                            <input type="text" class="form-control" id="routeName" required>
+                            <div class="invalid-feedback" id="routeNameError"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="routeDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="routeDescription" rows="2"></textarea>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button id="newRoute" class="btn btn-outline-primary">New Route</button>
+                            <button id="saveRoute" class="btn btn-primary">Save Route</button>
+                        </div>
+                        <div id="fileStatus" class="file-status">Changes will be saved to routes.json</div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Add Checkpoint</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="pointName" class="form-label">Checkpoint Name*</label>
+                            <input type="text" class="form-control" id="pointName" required>
+                            <div class="invalid-feedback" id="pointNameError"></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="latitude" class="form-label">Latitude*</label>
+                                <input type="number" step="0.000001" class="form-control" id="latitude" required>
+                                <div class="invalid-feedback" id="latitudeError"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="longitude" class="form-label">Longitude*</label>
+                                <input type="number" step="0.000001" class="form-control" id="longitude" required>
+                                <div class="invalid-feedback" id="longitudeError"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="addPoint" class="btn btn-primary">Add Checkpoint</button>
+                            <button id="updatePoint" class="btn btn-success" style="display: none;">Update Checkpoint</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Checkpoints (<span id="pointCount">0 points</span>)</h5>
+                        <button id="optimizeRoute" class="btn btn-sm btn-warning">Optimize Route</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="pointsList" class="p-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Route Map</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    Are you sure you want to perform this action?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmAction">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+    // Map variables
+    let map;
+    let markers = [];
+    let polyline = null;
+    let selectedPointId = null;
+    let directionArrows = [];
+    let currentRoute = {
+        id: generateId(),
+        name: '',
+        description: '',
+        points: [],
+        createdAt: null,
+        updatedAt: null,
+        metadata: {
+            optimized: false,
+            totalDistance: 0,
+            mapCenter: null,
+            mapZoom: null
+        }
+    };
+    
+    // Track unsaved changes
+    let hasUnsavedChanges = false;
+    
+    // Modal instance
+    let confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+    let pendingAction = null;
+    
+    // Initialize Sortable for checkpoint list
+    let sortable = new Sortable(document.getElementById('pointsList'), {
+        animation: 150,
+        handle: '.checkpoint-card',
+        onEnd: function() {
+            const pointsList = document.getElementById('pointsList');
+            const newOrder = Array.from(pointsList.children)
+                .filter(el => el.getAttribute('data-index'))
+                .map(el => parseInt(el.getAttribute('data-index')));
+            
+            currentRoute.points = newOrder.map(index => currentRoute.points[index]);
+            currentRoute.metadata.optimized = false;
+            
+            markUnsavedChanges();
+            renderPointsList();
+            updateMap();
+        }
+    });
+    
+    // Generate unique ID
+    function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+    
+    // Mark that there are unsaved changes
+    function markUnsavedChanges() {
+        if (!hasUnsavedChanges) {
+            hasUnsavedChanges = true;
+            document.getElementById('fileStatus').classList.add('unsaved-changes');
+            document.getElementById('fileStatus').textContent = 'You have unsaved changes';
+        }
+    }
+    
+    // Clear unsaved changes flag
+    function clearUnsavedChanges() {
+        hasUnsavedChanges = false;
+        document.getElementById('fileStatus').classList.remove('unsaved-changes');
+        document.getElementById('fileStatus').textContent = 'Changes saved to routes.json';
+    }
+    
+    // Save route to file
+    async function saveRouteToFile() {
+        try {
+            // Check if we have a route name
+            if (!validateRequired('routeName', 'Route name')) {
+                showError('routeName', 'Route name is required before saving');
+                return false;
+            }
+            
+            // Update route metadata
+            currentRoute.updatedAt = new Date().toISOString();
+            if (!currentRoute.createdAt) {
+                currentRoute.createdAt = currentRoute.updatedAt;
+            }
+            
+            // Calculate total distance if we have points
+            if (currentRoute.points.length >= 2) {
+                currentRoute.metadata.totalDistance = calculateRouteDistance(currentRoute.points);
+            }
+            
+            // Try to load existing routes data
+            let allRoutes = [];
+            try {
+                const response = await fetch('routes.json');
+                if (response.ok) {
+                    allRoutes = await response.json();
+                    if (!Array.isArray(allRoutes)) {
+                        allRoutes = [];
+                    }
+                }
+            } catch (error) {
+                console.log('No existing routes.json or error loading it, will create new one');
+            }
+            
+            // Update or add the current route
+            const existingIndex = allRoutes.findIndex(r => r.id === currentRoute.id);
+            if (existingIndex >= 0) {
+                allRoutes[existingIndex] = currentRoute;
+            } else {
+                allRoutes.push(currentRoute);
+            }
+            
+            // Convert to JSON
+            const routesData = JSON.stringify(allRoutes, null, 2);
+            
+            // In a real application, you would send this to your server
+            // For this demo, we'll simulate saving by creating a download
+            const blob = new Blob([routesData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a hidden link and trigger download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'routes.json';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+            
+            clearUnsavedChanges();
+            return true;
+        } catch (error) {
+            console.error('Error saving routes:', error);
+            document.getElementById('fileStatus').textContent = 'Error saving to routes.json';
+            return false;
+        }
+    }
+    
+    // Load routes from file
+    async function loadRoutesFromFile() {
+        try {
+            const response = await fetch('routes.json');
+            if (!response.ok) {
+                updateFileStatus('No existing routes.json found - will create on save');
+                return false;
+            }
+            
+            const allRoutes = await response.json();
+            if (!Array.isArray(allRoutes) || allRoutes.length === 0) {
+                updateFileStatus('No routes found in routes.json');
+                return false;
+            }
+            
+            // For this demo, we'll just load the first route
+            // In a real app, you'd have UI to select which route to edit
+            currentRoute = allRoutes[0];
+            
+            document.getElementById('routeName').value = currentRoute.name;
+            document.getElementById('routeDescription').value = currentRoute.description || '';
+            
+            renderPointsList();
+            updateMap();
+            
+            updateFileStatus(`Loaded from routes.json (${new Date().toLocaleDateString()})`);
+            clearUnsavedChanges();
+            return true;
+        } catch (error) {
+            console.error('Error loading routes:', error);
+            updateFileStatus('Error loading routes.json');
+            return false;
+        }
+    }
+    
+    // Update file status display
+    function updateFileStatus(message) {
+        const statusElement = document.getElementById('fileStatus');
+        statusElement.textContent = message;
+    }
+    
+    // Initialize the map
+    function initMap() {
+        try {
+            const defaultCenter = currentRoute.metadata.mapCenter || { lat: 0, lng: 0 };
+            const defaultZoom = currentRoute.metadata.mapZoom || 2;
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: defaultCenter,
+                zoom: defaultZoom,
+                gestureHandling: 'greedy',
+                mapTypeControl: true,
+                streetViewControl: false,
+                fullscreenControl: true
+            });
+            
+            // Add click listener to the map
+            map.addListener('click', function(e) {
+                document.getElementById('latitude').value = e.latLng.lat();
+                document.getElementById('longitude').value = e.latLng.lng();
+                clearError('latitude');
+                clearError('longitude');
+            });
+            
+            // Save map state when changed
+            map.addListener('center_changed', () => {
+                currentRoute.metadata.mapCenter = map.getCenter();
+                markUnsavedChanges();
+            });
+            
+            map.addListener('zoom_changed', () => {
+                currentRoute.metadata.mapZoom = map.getZoom();
+                markUnsavedChanges();
+            });
+            
+            // Try to get user's current location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        map.setCenter(userLocation);
+                        map.setZoom(14);
+                        
+                        new google.maps.Marker({
+                            position: userLocation,
+                            map: map,
+                            title: 'Your Location',
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: '#4285F4',
+                                fillOpacity: 1,
+                                strokeWeight: 2,
+                                strokeColor: '#FFFFFF'
+                            }
+                        });
+                    },
+                    function(error) {
+                        console.log('Error getting location:', error);
+                    }
+                );
+            }
+        } catch (error) {
+            console.error('Error initializing map:', error);
+            alert('Failed to initialize Google Maps. Please check your API key and internet connection.');
+        }
+    }
+    
+    // Show error message
+    function showError(fieldId, message) {
+        const errorElement = document.getElementById(`${fieldId}Error`);
+        if (errorElement) {
+            errorElement.textContent = message;
+            document.getElementById(fieldId).classList.add('is-invalid');
+        }
+    }
+    
+    // Clear error message
+    function clearError(fieldId) {
+        const errorElement = document.getElementById(`${fieldId}Error`);
+        if (errorElement) {
+            errorElement.textContent = '';
+            document.getElementById(fieldId).classList.remove('is-invalid');
+        }
+    }
+    
+    // Validate required fields
+    function validateRequired(fieldId, fieldName) {
+        const value = document.getElementById(fieldId).value.trim();
+        if (!value) {
+            showError(fieldId, `${fieldName} is required`);
+            return false;
+        }
+        clearError(fieldId);
+        return true;
+    }
+    
+    // Validate coordinates
+    function validateCoordinates() {
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        
+        let isValid = true;
+        
+        if (isNaN(lat)) {
+            showError('latitude', 'Please enter a valid latitude');
+            isValid = false;
+        } else if (lat < -90 || lat > 90) {
+            showError('latitude', 'Latitude must be between -90 and 90');
+            isValid = false;
+        } else {
+            clearError('latitude');
+        }
+        
+        if (isNaN(lng)) {
+            showError('longitude', 'Please enter a valid longitude');
+            isValid = false;
+        } else if (lng < -180 || lng > 180) {
+            showError('longitude', 'Longitude must be between -180 and 180');
+            isValid = false;
+        } else {
+            clearError('longitude');
+        }
+        
+        return isValid;
+    }
+    
+    // Render the points list
+    function renderPointsList() {
+        const pointsList = document.getElementById('pointsList');
+        
+        if (currentRoute.points.length === 0) {
+            pointsList.innerHTML = '<div class="text-muted">No checkpoints added yet.</div>';
+            document.getElementById('pointCount').textContent = '0 points';
+            return;
+        }
+        
+        pointsList.innerHTML = '';
+        
+        currentRoute.points.forEach((point, index) => {
+            const pointElement = document.createElement('div');
+            pointElement.className = `checkpoint-card ${selectedPointId === index ? 'active' : ''}`;
+            pointElement.setAttribute('data-index', index);
+            pointElement.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${point.name || 'Checkpoint ' + (index + 1)}</strong>
+                        <div class="coordinates">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary edit-point" data-index="${index}">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger delete-point" data-index="${index}">Delete</button>
+                    </div>
+                </div>
+            `;
+            pointsList.appendChild(pointElement);
+        });
+        
+        document.getElementById('pointCount').textContent = `${currentRoute.points.length} point${currentRoute.points.length !== 1 ? 's' : ''}`;
+        
+        document.querySelectorAll('.edit-point').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                editPoint(index);
+            });
+        });
+        
+        document.querySelectorAll('.delete-point').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const index = parseInt(this.getAttribute('data-index'));
+                showConfirmation(
+                    'Delete Checkpoint',
+                    `Are you sure you want to delete the checkpoint "${currentRoute.points[index].name || 'Checkpoint ' + (index + 1)}"?`,
+                    () => deletePoint(index)
+                );
+            });
+        });
+    }
+    
+    // Update the map with markers and polyline
+    function updateMap() {
+        try {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            
+            if (polyline) {
+                polyline.setMap(null);
+            }
+            
+            directionArrows.forEach(marker => marker.setMap(null));
+            directionArrows = [];
+            
+            currentRoute.points.forEach((point, index) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: point.lat, lng: point.lng },
+                    map: map,
+                    title: point.name || `Checkpoint ${index + 1}`,
+                    label: {
+                        text: (index + 1).toString(),
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                        scaledSize: new google.maps.Size(32, 32)
+                    }
+                });
+                
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div>
+                            <h6>${point.name || `Checkpoint ${index + 1}`}</h6>
+                            <p>Coordinates: ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</p>
+                            <button class="btn btn-sm btn-primary" onclick="window.editPointFromMap(${index})">Edit</button>
+                        </div>
+                    `
+                });
+                
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+                
+                markers.push(marker);
+            });
+            
+            if (currentRoute.points.length >= 2) {
+                const path = currentRoute.points.map(point => ({
+                    lat: point.lat,
+                    lng: point.lng
+                }));
+                
+                polyline = new google.maps.Polyline({
+                    path: path,
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 4,
+                    map: map
+                });
+                
+                addDirectionArrows(map, polyline);
+                currentRoute.metadata.totalDistance = calculateRouteDistance(currentRoute.points);
+            }
+            
+            if (currentRoute.points.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                currentRoute.points.forEach(point => {
+                    bounds.extend(new google.maps.LatLng(point.lat, point.lng));
+                });
+                map.fitBounds(bounds);
+            }
+        } catch (error) {
+            console.error('Error updating map:', error);
+        }
+    }
+    
+    // Add direction arrows to the polyline
+    function addDirectionArrows(map, polyline) {
+        directionArrows.forEach(marker => marker.setMap(null));
+        directionArrows = [];
+        
+        const path = polyline.getPath();
+        const arrowSpacing = 2000; // in meters
+        
+        for (let i = 0; i < path.getLength() - 1; i++) {
+            const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
+                path.getAt(i), path.getAt(i + 1));
+            
+            const numArrows = Math.floor(segmentLength / arrowSpacing);
+            
+            for (let j = 0; j < numArrows; j++) {
+                const position = google.maps.geometry.spherical.interpolate(
+                    path.getAt(i), path.getAt(i + 1), j / numArrows);
+                
+                const heading = google.maps.geometry.spherical.computeHeading(
+                    path.getAt(i), path.getAt(i + 1));
+                
+                const arrowMarker = new google.maps.Marker({
+                    position: position,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                        fillColor: '#FF0000',
+                        fillOpacity: 0.8,
+                        strokeWeight: 0,
+                        scale: 3,
+                        rotation: heading
+                    },
+                    zIndex: 1000
+                });
+                
+                directionArrows.push(arrowMarker);
+            }
+        }
+    }
+    
+    // Calculate distance between two points in meters
+    function calculateDistance(point1, point2) {
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = point1.lat * Math.PI/180;
+        const φ2 = point2.lat * Math.PI/180;
+        const Δφ = (point2.lat - point1.lat) * Math.PI/180;
+        const Δλ = (point2.lng - point1.lng) * Math.PI/180;
+        
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        
+        return R * c;
+    }
+    
+    // Calculate total route distance
+    function calculateRouteDistance(points) {
+        let totalDistance = 0;
+        for (let i = 0; i < points.length - 1; i++) {
+            totalDistance += calculateDistance(points[i], points[i+1]);
+        }
+        return totalDistance;
+    }
+    
+    // Add a new point to the route
+    function addPoint() {
+        const isNameValid = validateRequired('pointName', 'Checkpoint name');
+        const areCoordsValid = validateCoordinates();
+        
+        if (!isNameValid || !areCoordsValid) return;
+        
+        const name = document.getElementById('pointName').value.trim();
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        
+        const point = {
+            id: generateId(),
+            name: name || `Checkpoint ${currentRoute.points.length + 1}`,
+            lat: lat,
+            lng: lng,
+            metadata: {
+                isBusStop: true,
+                waitTime: 0
+            }
+        };
+        
+        currentRoute.points.push(point);
+        currentRoute.metadata.optimized = false;
+        
+        markUnsavedChanges();
+        renderPointsList();
+        updateMap();
+        
+        document.getElementById('pointName').value = '';
+        document.getElementById('latitude').value = '';
+        document.getElementById('longitude').value = '';
+        document.getElementById('pointName').focus();
+    }
+    
+    // Edit an existing point
+    function editPoint(index) {
+        if (index < 0 || index >= currentRoute.points.length) return;
+        
+        const point = currentRoute.points[index];
+        document.getElementById('pointName').value = point.name;
+        document.getElementById('latitude').value = point.lat;
+        document.getElementById('longitude').value = point.lng;
+        
+        selectedPointId = index;
+        renderPointsList();
+        
+        document.getElementById('addPoint').style.display = 'none';
+        document.getElementById('updatePoint').style.display = 'block';
+    }
+    
+    // Global function to edit point from map info window
+    window.editPointFromMap = function(index) {
+        editPoint(index);
+        markers.forEach(marker => {
+            google.maps.event.trigger(marker, 'click');
+        });
+    };
+    
+    // Update an existing point
+    function updatePoint() {
+        if (selectedPointId === null) return;
+        
+        const isNameValid = validateRequired('pointName', 'Checkpoint name');
+        const areCoordsValid = validateCoordinates();
+        
+        if (!isNameValid || !areCoordsValid) return;
+        
+        const name = document.getElementById('pointName').value.trim();
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        
+        currentRoute.points[selectedPointId] = {
+            ...currentRoute.points[selectedPointId],
+            name: name || `Checkpoint ${selectedPointId + 1}`,
+            lat: lat,
+            lng: lng
+        };
+        
+        selectedPointId = null;
+        
+        markUnsavedChanges();
+        renderPointsList();
+        updateMap();
+        
+        document.getElementById('pointName').value = '';
+        document.getElementById('latitude').value = '';
+        document.getElementById('longitude').value = '';
+        
+        document.getElementById('addPoint').style.display = 'block';
+        document.getElementById('updatePoint').style.display = 'none';
+    }
+    
+    // Delete a point
+    function deletePoint(index) {
+        if (index < 0 || index >= currentRoute.points.length) return;
+        
+        currentRoute.points.splice(index, 1);
+        currentRoute.metadata.optimized = false;
+        
+        if (selectedPointId === index) {
+            selectedPointId = null;
+            document.getElementById('pointName').value = '';
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
+            document.getElementById('addPoint').style.display = 'block';
+            document.getElementById('updatePoint').style.display = 'none';
+        }
+        
+        markUnsavedChanges();
+        renderPointsList();
+        updateMap();
+    }
+    
+    // Optimize route order
+    function optimizeRoute() {
+        if (currentRoute.points.length < 3) {
+            alert('Need at least 3 checkpoints to optimize route');
+            return;
+        }
+        
+        currentRoute.points.sort((a, b) => b.lng - a.lng);
+        currentRoute.metadata.optimized = true;
+        
+        markUnsavedChanges();
+        renderPointsList();
+        updateMap();
+        
+        const distanceBefore = currentRoute.metadata.totalDistance;
+        const distanceAfter = calculateRouteDistance(currentRoute.points);
+        const reduction = ((distanceBefore - distanceAfter) / distanceBefore * 100).toFixed(1);
+        
+        document.getElementById('modalTitle').textContent = 'Route Optimized';
+        document.getElementById('modalBody').innerHTML = `
+            <p>Route optimization complete!</p>
+            <p>Distance before: ${(distanceBefore / 1000).toFixed(1)} km</p>
+            <p>Distance after: ${(distanceAfter / 1000).toFixed(1)} km</p>
+            <p>Reduction: ${reduction}%</p>
+        `;
+        document.getElementById('confirmAction').style.display = 'none';
+        confirmationModal.show();
+        
+        setTimeout(() => {
+            confirmationModal.hide();
+            document.getElementById('confirmAction').style.display = 'block';
+        }, 3000);
+    }
+    
+    // Create a new route
+    function newRoute() {
+        if (hasUnsavedChanges) {
+            showConfirmation(
+                'Unsaved Changes',
+                'You have unsaved changes. Creating a new route will discard these changes. Continue?',
+                () => {
+                    createNewRoute();
+                }
+            );
+        } else {
+            createNewRoute();
+        }
+    }
+    
+    // Actually create the new route
+    function createNewRoute() {
+        if (!validateRequired('routeName', 'Route name')) return;
+        
+        const routeName = document.getElementById('routeName').value.trim();
+        const routeDescription = document.getElementById('routeDescription').value.trim();
+        
+        currentRoute = {
+            id: generateId(),
+            name: routeName,
+            description: routeDescription,
+            points: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            metadata: {
+                optimized: false,
+                totalDistance: 0,
+                mapCenter: null,
+                mapZoom: null
+            }
+        };
+        
+        document.getElementById('routeDescription').value = '';
+        
+        markUnsavedChanges();
+        renderPointsList();
+        updateMap();
+    }
+    
+    // Save the current route
+    async function saveRoute() {
+        if (!validateRequired('routeName', 'Route name')) return;
+        
+        const routeName = document.getElementById('routeName').value.trim();
+        const routeDescription = document.getElementById('routeDescription').value.trim();
+        
+        currentRoute.name = routeName;
+        currentRoute.description = routeDescription;
+        currentRoute.updatedAt = new Date().toISOString();
+        
+        if (!currentRoute.createdAt) {
+            currentRoute.createdAt = currentRoute.updatedAt;
+        }
+        
+        if (currentRoute.points.length >= 2 && currentRoute.metadata.totalDistance === 0) {
+            currentRoute.metadata.totalDistance = calculateRouteDistance(currentRoute.points);
+        }
+        
+        await saveRouteToFile();
+    }
+    
+    // Show confirmation dialog
+    function showConfirmation(title, message, callback) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalBody').textContent = message;
+        document.getElementById('confirmAction').style.display = 'block';
+        
+        pendingAction = callback;
+        confirmationModal.show();
+    }
+    
+    // Event listeners
+    document.getElementById('addPoint').addEventListener('click', addPoint);
+    document.getElementById('updatePoint').addEventListener('click', updatePoint);
+    document.getElementById('optimizeRoute').addEventListener('click', optimizeRoute);
+    document.getElementById('newRoute').addEventListener('click', newRoute);
+    document.getElementById('saveRoute').addEventListener('click', saveRoute);
+    document.getElementById('confirmAction').addEventListener('click', function() {
+        if (pendingAction) {
+            pendingAction();
+            pendingAction = null;
+        }
+        confirmationModal.hide();
+    });
+    
+    // Form field change listeners
+    document.getElementById('routeName').addEventListener('input', markUnsavedChanges);
+    document.getElementById('routeDescription').addEventListener('input', markUnsavedChanges);
+    
+    // Initialize
+    window.initMap = initMap;
+    
+    // Try to load existing route data on startup
+    loadRoutesFromFile();
+});
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&callback=initMap&libraries=geometry" async defer></script>
+</body>
+</html>

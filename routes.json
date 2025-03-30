@@ -1,0 +1,138 @@
+[
+  {
+    "id": "m8trcm26lxendnjr2d",
+    "name": "college to biotech",
+    "description": "",
+    "points": [
+      {
+        "id": "m8trczx8mqkid3cxxj",
+        "name": "college",
+        "lat": 9.574767977595346,
+        "lng": 77.67977714538574,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8trf50rau66i6hckpo",
+        "name": "hostel",
+        "lat": 9.573541271664709,
+        "lng": 77.67810952867953,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8trdyza4or0npgthrj",
+        "name": "gym",
+        "lat": 9.575667223429367,
+        "lng": 77.67674088478088,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8trdhkopaejxl0y5z8",
+        "name": "office",
+        "lat": 9.574186111375305,
+        "lng": 77.67634391784668,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8trexwbnpt3qs5fdmh",
+        "name": "tifac",
+        "lat": 9.572362443776719,
+        "lng": 77.67605084913421,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8tredt90jsz1zsgl0wc",
+        "name": "biotech",
+        "lat": 9.573335526945849,
+        "lng": 77.67382478661602,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      }
+    ],
+    "createdAt": "2025-03-29T05:18:06.549Z",
+    "updatedAt": "2025-03-29T05:18:06.549Z",
+    "metadata": {
+      "optimized": true,
+      "totalDistance": 1150.7732459581496,
+      "mapCenter": {
+        "lat": 9.574014837621997,
+        "lng": 77.67680096600088
+      },
+      "mapZoom": 16
+    }
+  },
+  {
+    "id": "m8ts4h3t4c6dk2n5vql",
+    "name": "college-hostel",
+    "description": "",
+    "points": [
+      {
+        "id": "m8ts6zb6ztsroagxa39",
+        "name": "mess",
+        "lat": 9.573279049715191,
+        "lng": 77.67819953852107,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8ts681a3if55jo2qcf",
+        "name": "room 72",
+        "lat": 9.573685804062894,
+        "lng": 77.67808217084374,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8ts6rzocbviib1f5e",
+        "name": "room 160",
+        "lat": 9.573213241084924,
+        "lng": 77.67789797289036,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      },
+      {
+        "id": "m8ts5w7l5b7ufjbym62",
+        "name": "room 139",
+        "lat": 9.573411028577008,
+        "lng": 77.67777046709321,
+        "metadata": {
+          "isBusStop": true,
+          "waitTime": 0
+        }
+      }
+    ],
+    "createdAt": "2025-03-29T05:39:23.132Z",
+    "updatedAt": "2025-03-29T05:39:23.132Z",
+    "metadata": {
+      "optimized": true,
+      "totalDistance": 129.37893084689262,
+      "mapCenter": {
+        "lat": 9.573672892569867,
+        "lng": 77.67802828391834
+      },
+      "mapZoom": 19
+    }
+  }
+]
